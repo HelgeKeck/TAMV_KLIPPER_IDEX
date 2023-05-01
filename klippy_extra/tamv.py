@@ -5,7 +5,8 @@ class TAMV:
         self.printer = self.config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
 
-        self.tool_current = "-2"          # -2 Unknown tool locked, -1 No tool locked, 0 and up are tools.
+        self.offset = None                  # Offset of the nozzle in the format X, Y, Z
+        self.tool_current = "-2"            # -2 Unknown tool locked, -1 No tool locked, 0 and up are tools.
 
         self.gcode.register_command('TAMV_SET_TOOL', self.cmd_TAMV_SET_TOOL, desc=("TAMV_SET_TOOL"))
         self.gcode.register_command('TAMV_SET_TOOL_OFFSET', self.cmd_SET_TOOL_OFFSET, desc=("SET_TOOL_OFFSET"))
@@ -17,9 +18,13 @@ class TAMV:
     def cmd_TAMV_SET_TOOL(self, param):
         tool = param.get_int('TOOL', -1) 
         self.tool_current = str(tool)
-        save_variables = self.printer.lookup_object('save_variables')
-        save_variables.cmd_SAVE_VARIABLE(self.gcode.create_gcode_command(
-            "SAVE_VARIABLE", "SAVE_VARIABLE", {"VARIABLE": "tool_current", 'VALUE': tool}))
+
+        self.respond(str(self.toolhead['name']))
+
+        self.save_variable("tool_current", tool)
+        self.respond(self.load_variable("tool_current"))
+        # tool_current = self.load_variable("tool_current")
+        # self.save_variable("tool_current", tool)
 
     def cmd_SET_TOOL_OFFSET(self, gcmd):
         tool_id = gcmd.get_int('TOOL', self.tool_current, minval=0)
@@ -57,6 +62,18 @@ class TAMV:
             "tool_current": self.tool_current
         }
         return status
+
+    def load_variable(self, name):
+        save_variables = self.printer.lookup_object('save_variables')
+        return save_variables.allVariables[name]
+
+    def save_variable(self, name, value):
+        save_variables = self.printer.lookup_object('save_variables')
+        save_variables.cmd_SAVE_VARIABLE(self.gcode.create_gcode_command(
+            "SAVE_VARIABLE", "SAVE_VARIABLE", {"VARIABLE": name, 'VALUE': value}))
+
+    def respond(self, message):
+        self.gcode.respond_raw(message)
 
 def load_config(config):
     return TAMV(config)
